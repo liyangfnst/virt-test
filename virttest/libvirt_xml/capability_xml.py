@@ -6,7 +6,7 @@ http://libvirt.org/formatcaps.html
 from virttest import virsh, xml_utils
 from virttest.libvirt_xml import base, accessors, xcepts
 
-class LibvirtXML(base.LibvirtXMLBase):
+class CapabilityXML(base.LibvirtXMLBase):
     """
     Handler of libvirt capabilities and nonspecific item operations.
 
@@ -55,7 +55,7 @@ class LibvirtXML(base.LibvirtXMLBase):
         # This will skip self.get_feature_list() defined below
         accessors.AllForbidden(property_name="feature_list",
                                  libvirtxml=self)
-        super(LibvirtXML, self).__init__(virsh_instance)
+        super(CapabilityXML, self).__init__(virsh_instance)
         # calls set_xml accessor method
         self['xml'] = self.dict_get('virsh').capabilities()
 
