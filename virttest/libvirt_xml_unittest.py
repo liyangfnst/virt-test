@@ -4,7 +4,7 @@ import unittest
 import common
 from virttest import xml_utils, virsh
 from virttest.libvirt_xml import accessors, vm_xml, xcepts, network_xml, base
-from virttest.libvirt_xml import libvirt_xml
+from virttest.libvirt_xml import capability_xml
 
 
 UUID = "8109c109-1551-cb11-8e2c-bc43745252ef"
@@ -144,7 +144,7 @@ class AccessorsTest(LibvirtXMLTestBase):
 class TestLibvirtXML(LibvirtXMLTestBase):
 
     def _from_scratch(self):
-        return libvirt_xml.LibvirtXML(self.dummy_virsh)
+        return capability_xml.CapabilityXML(self.dummy_virsh)
 
 
     def test_uuid(self):
