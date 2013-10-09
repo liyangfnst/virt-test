@@ -246,6 +246,7 @@ class VMXMLBase(base.LibvirtXMLBase):
         self.xmltreefile.write()
 
 
+
 class VMXML(VMXMLBase):
 
     """
@@ -369,6 +370,39 @@ class VMXML(VMXMLBase):
         vmxml.define()
         # Temporary files for vmxml cleaned up automatically
         # when it goes out of scope here.
+
+    @staticmethod
+    def get_first_nic(vm_name, virsh_instance=base.virsh):
+        """
+        Get first mac_address of a dommain
+        """
+        vmxml = VMXML.new_from_dumpxml(vm_name, virsh_instance=virsh_instance)
+        nic = vmxml.xmltreefile.find('devices').findall('interface')
+        nic_dict = {}
+        if nic is not None:
+            first_nic = nic[0]
+            mac_address = first_nic.find('mac').get('address')
+            nic_dict['mac_address'] = mac_address
+            iface_source = first_nic.find('source').get('bridge')
+            nic_dict['iface_source'] = iface_source
+            iface_type = first_nic.get('type')
+            nic_dict['iface_type'] = iface_type
+        return nic_dict
+
+    @staticmethod
+    def get_disk_device(vm_name, virsh_instance=base.virsh):
+        """
+        Get device name of a defined VM's disks.
+
+        @param: vm_name: Name of defined vm.
+        """
+        vmxml = VMXML.new_from_dumpxml(vm_name, virsh_instance=virsh_instance)
+        disks = vmxml.get_disk_all()
+        disk_device = []
+        for disk in disks:
+            device = disk.get('device')
+            disk_device.append(device)
+        return disk_device
 
     @staticmethod
     def check_cpu_mode(mode):
