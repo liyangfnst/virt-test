@@ -4,6 +4,7 @@ libguestfs tools test utility functions.
 
 import logging
 import signal
+import os
 
 from autotest.client import os_dep, utils
 from autotest.client.shared import error
@@ -53,15 +54,19 @@ def lgf_cmd_check(cmd):
         return None
 
 
-def lgf_command(cmd, ignore_status=True, debug=False, timeout=60):
+def lgf_command(cmd, **dargs):
     """
     Interface of libguestfs tools' commands.
 
     :param cmd: Command line to execute.
+    :param dargs: standardized libguestfs function API keywords
     :return: CmdResult object.
     :raise: LibguestfsCmdError if non-zero exit status
             and ignore_status=False
     """
+    ignore_status = dargs.get('ignore_status', True)
+    debug = dargs.get('debug', False)
+    timeout = dargs.get('timeout', 60)
     if debug:
         logging.debug("Running command %s in debug mode.", cmd)
 
@@ -207,7 +212,8 @@ class Guestfish(LibguestfsBase):
         timeout = self.dict_get('timeout')
         if command:
             guestfs_exec += " %s" % command
-            return lgf_command(guestfs_exec, ignore_status, debug, timeout)
+            return lgf_command(guestfs_exec, ignore_status=ignore_status,
+                               debug=debug, timeout=timeout)
         else:
             raise LibguestfsCmdError("No built-in command was passed.")
 
@@ -267,7 +273,8 @@ class GuestfishSession(aexpect.ShellSession):
         result = utils.CmdResult(cmd, stdout, stderr, exit_status)
         if not ignore_status and exit_status:
             raise error.CmdError(cmd, result,
-                                 "Guestfish Command returned non-zero exit status")
+                                 "Guestfish Command returned"
+                                 " non-zero exit status")
         return result
 
 
@@ -694,8 +701,7 @@ class GuestfishPersistent(Guestfish):
 
 # libguestfs module functions follow #####
 def libguest_test_tool_cmd(qemuarg=None, qemudirarg=None,
-                           timeoutarg=None, ignore_status=True,
-                           debug=False, timeout=60):
+                           timeoutarg=None, **dargs):
     """
     Execute libguest-test-tool command.
 
@@ -714,12 +720,11 @@ def libguest_test_tool_cmd(qemuarg=None, qemudirarg=None,
         cmd += " --timeout %s" % timeoutarg
 
     # Allow to raise LibguestfsCmdError if ignore_status is False.
-    return lgf_command(cmd, ignore_status, debug, timeout)
+    return lgf_command(cmd, **dargs)
 
 
 def virt_edit_cmd(disk_or_domain, file_path, options=None,
-                  extra=None, expr=None, ignore_status=True,
-                  debug=False, timeout=60):
+                  extra=None, expr=None, **dargs):
     """
     Execute virt-edit command to check whether it is ok.
 
@@ -730,7 +735,7 @@ def virt_edit_cmd(disk_or_domain, file_path, options=None,
     :param file_path: the file need to be edited in img file.
     :param options: the options of virt-edit.
     :param extra: additional suffix of command.
-    :return: a session of executing virt-edit command.
+    :return: a CmdResult object.
     """
     # disk_or_domain and file_path are necessary parameters.
     cmd = "virt-edit '%s' '%s'" % (disk_or_domain, file_path)
@@ -741,4 +746,130 @@ def virt_edit_cmd(disk_or_domain, file_path, options=None,
     if expr is not None:
         cmd += " -e '%s'" % expr
 
-    return lgf_command(cmd, ignore_status, debug, timeout)
+    return lgf_command(cmd, **dargs)
+
+
+def virt_sysprep_cmd(disk_or_domain, options=None,
+                     extra=None, **dargs):
+    """
+    Execute virt-sysprep command to reset or unconfigure a virtual machine.
+
+    :param disk_or_domain: a img path or a domain name.
+    :param options: the options of virt-sysprep.
+    :return: a CmdResult object.
+    """
+    dargs['timeout'] = 600
+    if os.path.isfile(disk_or_domain):
+        disk_or_domain = "-a " + disk_or_domain
+    else:
+        disk_or_domain = "-d " + disk_or_domain
+    cmd = "virt-sysprep %s" % (disk_or_domain)
+    if options is not None:
+        cmd += " %s" % options
+    if extra is not None:
+        cmd += " %s" % extra
+
+    return lgf_command(cmd, **dargs)
+
+
+def virt_cat_cmd(disk_or_domain, file_path, options=None, **dargs):
+    """
+    Execute virt-cat command to print guest's file detail.
+
+    :param disk_or_domain: a img path or a domain name.
+    :param file_path: the file to print detail
+    :param options: the options of virt-cat.
+    :return: a CmdResult object.
+    """
+    dargs['timeout'] = 600
+    # disk_or_domain and file_path are necessary parameters.
+    if os.path.isfile(disk_or_domain):
+        disk_or_domain = "-a " + disk_or_domain
+    else:
+        disk_or_domain = "-d " + disk_or_domain
+    cmd = "virt-cat %s '%s'" % (disk_or_domain, file_path)
+    if options is not None:
+        cmd += " %s" % options
+
+    return lgf_command(cmd, **dargs)
+
+
+def virt_clone_cmd(org_domain, new_domain=None, new_uuid=None, file_path=None,
+                   force_copy_target=None, new_mac=None, options=None, **dargs):
+    """
+    Execute virt-clone command to clone a new guest.
+
+    :param org_domain: Name of the original guest.
+    :param new_domain: Name of the new guest.
+    :param new_uuid: New UUID for the clone guest.
+    :param file_path: New file to use as the disk image for the new guest.
+    :param force_copy: Force to copy devices(--force-copy=hdc).
+    :param new_mac: New fixed MAC address for the clone guest.
+    :param options: the options of virt-clone.
+    :return: a CmdResult object.
+    """
+    dargs['timeout'] = 600
+    cmd = "virt-clone -o %s " % org_domain
+    if new_domain is not None:
+        cmd += "-n %s " % new_domain
+    if new_uuid is not None:
+        cmd += "-u %s " % new_uuid
+    if file_path is not None:
+        cmd += "-f %s " % file_path
+    if force_copy_target is not None:
+        cmd += "--force-copy=%s " % force_copy_target
+    if new_mac is not None:
+        cmd += "-m %s " % new_mac
+    if options is not None:
+        cmd += "%s" % options
+
+    return lgf_command(cmd, **dargs)
+
+
+def virt_resize_cmd(in_disk, out_disk, delete_part=None, expand_part=None,
+                   in_format=None, ignore_part=None, expand_lv=None,
+                   out_format=None, resize_part=None, resize_part_size=None,
+                   resize_force=False, shrink_part=None, options=None, **dargs):
+    """
+    Execute virt-resize command to resize a virtual machine disk.
+
+    :param in_disk: Input disk file.
+    :param out_disk: Output disk file.
+    :param delete_part: Delete partition.
+    :param expand_part: Expand partition.
+    :param in_format: Input disk format.
+    :param ignore_part: Ignore partition.
+    :param expand_lv: Expand logical volum.e
+    :param out_format: Output disk format.
+    :param resize_part: Resize partition.
+    :param resize_part_size: Resize partition size.
+    :param resize_force: Forcefully resize partition or not.
+    :param shrink_part: Shrink partition.
+    :param options: the options of virt-resize.
+    :return: a CmdResult object.
+    """
+    dargs['timeout'] = 600
+    cmd = "virt-resize %s %s " % (in_disk, out_disk)
+    if delete_part is not None:
+        cmd += "--delete %s " % delete_part
+    if expand_part is not None:
+        cmd += "--expand %s " % expand_part
+    if in_format is not None:
+        cmd += "--format %s " % in_format
+    if ignore_part is not None:
+        cmd += "--ignore %s " % ignore_part
+    if expand_lv is not None:
+        cmd += "--lv-expand %s " % expand_lv
+    if out_format is not None:
+        cmd += "--output-format %s " % out_format
+    if resize_part is not None and resize_part_size is not None:
+        if resize_force:
+            cmd += "--resize-force %s=%s "% (resize_part, resize_part_size)
+        else:
+            cmd += "--resize %s=%s "% (resize_part, resize_part_size)
+    if shrink_part is not None:
+        cmd += "--shrink %s " % shrink_part
+    if options is not None:
+        cmd += "%s" % options
+
+    return lgf_command(cmd, **dargs)
