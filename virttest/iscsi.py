@@ -118,13 +118,13 @@ class Iscsi(object):
         else:
             self.id = utils.generate_random_string(4)
         self.initiator = params.get("initiator")
-        if params.get("emulated_image"):
+        emulated_image = params.get("emulated_image", "emulated_image")
+        if emulated_image:
             self.initiator = None
             os_dep.command("tgtadm")
-            emulated_image = params.get("emulated_image")
             self.emulated_image = os.path.join(root_dir, emulated_image)
             self.emulated_id = ""
-            self.emulated_size = params.get("image_size")
+            self.emulated_size = params.get("image_size", "1G")
             self.unit = self.emulated_size[-1].upper()
             self.emulated_size = self.emulated_size[:-1]
             # maps K,M,G,T => (count, bs)
